@@ -1,0 +1,9 @@
+# Carpetas de Python que no queremos en GitHub
+backend/venv/
+backend/__pycache__/
+backend/*.db
+
+# Carpetas de Flutter que no queremos en GitHub
+mobile/.dart_tool/
+mobile/build/
+mobile/.flutter-plugins
