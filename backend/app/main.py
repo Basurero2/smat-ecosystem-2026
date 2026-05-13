@@ -2,20 +2,24 @@ from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
-from . import models, database # El punto (.) indica que están en la misma carpeta
+from pydantic import BaseModel # <-- NUEVO: Para validar el JSON
+from . import models, database 
 
 # Inicialización de la Base de Datos
 models.Base.metadata.create_all(bind=database.engine)
 
-# --- METADATOS DE DOCUMENTACIÓN (Lab 4.2) ---
+# --- ESQUEMA PYDANTIC (NUEVO) ---
+class EstacionCreate(BaseModel):
+    id: int
+    nombre: str
+    ubicacion: str
+
+# --- METADATOS DE DOCUMENTACIÓN ---
 app = FastAPI(
     title="SMAT - Sistema de Monitoreo FISI UNMSM",
     description="""
     ## API Profesional de Telemetría y Alerta Temprana
     Esta API permite gestionar estaciones de monitoreo y procesar lecturas de sensores con seguridad avanzada.
-    * **Arquitectura:** Estructura modular /app.
-    * **Seguridad:** Implementación de JWT (OAuth2).
-    * **Persistencia:** SQLite con SQLAlchemy.
     """,
     version="1.6.2",
     contact={"name": "Juan Carlos", "email": "juan.carlos@unmsm.edu.pe"}
@@ -23,21 +27,18 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Permite conexiones de cualquier origen (Chrome, Móvil)
+    allow_origins=["*"], 
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# --- CONFIGURACIÓN DE SEGURIDAD ---
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
-# --- CONFIGURACIÓN DE SEGURIDAD (Lab 4.4) ---
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
-@app.post("/token", tags=["Seguridad"], summary="Obtener token de acceso")
+@app.post("/login", tags=["Seguridad"], summary="Obtener token de acceso")
 async def login():
-    # En una app real se validaría usuario/password. Aquí usamos una llave estática para el lab.
     return {"access_token": "token_secreto_unmsm_2026", "token_type": "bearer"}
 
-# Dependencia para la DB
 def get_db():
     db = database.SessionLocal()
     try:
@@ -48,17 +49,17 @@ def get_db():
 # --- ENDPOINTS PROTEGIDOS ---
 
 @app.post("/estaciones/", status_code=status.HTTP_201_CREATED, tags=["Gestión"], summary="Registrar nueva estación")
-def crear_estacion(id: int, nombre: str, ubicacion: str, 
+def crear_estacion(estacion: EstacionCreate, # <-- AHORA USA EL MODELO
                    db: Session = Depends(get_db), 
-                   token: str = Depends(oauth2_scheme)): # Pide el token
+                   token: str = Depends(oauth2_scheme)): 
     if token != "token_secreto_unmsm_2026":
         raise HTTPException(status_code=401, detail="No autorizado")
     
-    existe = db.query(models.Estacion).filter(models.Estacion.id == id).first()
+    existe = db.query(models.Estacion).filter(models.Estacion.id == estacion.id).first()
     if existe:
         raise HTTPException(status_code=400, detail="El ID ya existe")
     
-    nueva = models.Estacion(id=id, nombre=nombre, ubicacion=ubicacion)
+    nueva = models.Estacion(id=estacion.id, nombre=estacion.nombre, ubicacion=estacion.ubicacion)
     db.add(nueva)
     db.commit()
     db.refresh(nueva)
