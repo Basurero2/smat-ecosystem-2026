@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'dart:math'; // <-- NUEVO: Para generar IDs aleatorios
+import 'dart:math'; 
 import 'package:mobile/services/auth_service.dart';
 
 void main() => runApp(const MaterialApp(home: MyApp()));
@@ -46,6 +46,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final url = Uri.parse("http://192.168.0.114:8000/login"); 
     
     try {
+      // Petición optimizada para evitar problemas de CORS y bloqueos en Flutter Web
       final response = await http.post(
         url,
         body: {'username': _userController.text, 'password': _passController.text},
@@ -61,11 +62,14 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Credenciales incorrectas"))
+          SnackBar(content: Text("Credenciales incorrectas o error: ${response.statusCode}"))
         );
       }
     } catch (e) {
       print("Error: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("No se pudo conectar con el servidor backend"))
+      );
     }
   }
 
@@ -76,6 +80,7 @@ class _LoginScreenState extends State<LoginScreen> {
       body: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             TextField(controller: _userController, decoration: const InputDecoration(labelText: "Usuario")),
             TextField(controller: _passController, decoration: const InputDecoration(labelText: "Contraseña"), obscureText: true),
@@ -88,7 +93,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-// --- PANTALLA DE HOME ---
+// --- PANTALLA DE HOME ( DASHBOARD DE TELEMETRÍA ) ---
 class SMATHome extends StatefulWidget {
   const SMATHome({super.key});
   @override
@@ -112,9 +117,7 @@ class _SMATHomeState extends State<SMATHome> {
       throw Exception('Error de conexión');
     }
   }
-  
 
-// --- RETO 6.2: POST para crear estación (Formato JSON) ---
   Future<void> crearEstacion(String nombre, String ubicacion) async {
     final token = await AuthService().getToken();
     final randomId = Random().nextInt(10000); 
@@ -123,7 +126,7 @@ class _SMATHomeState extends State<SMATHome> {
       final response = await http.post(
         Uri.parse(backendUrl),
         headers: {
-          'Content-Type': 'application/json', // Le decimos que enviamos JSON
+          'Content-Type': 'application/json',
           'Authorization': 'Bearer $token', 
         },
         body: json.encode({
@@ -134,7 +137,7 @@ class _SMATHomeState extends State<SMATHome> {
       );
 
       if (response.statusCode == 201 || response.statusCode == 200) {
-        setState(() {}); // Refresca la lista automáticamente
+        setState(() {}); 
       } else {
         print("Error del servidor: ${response.statusCode}");
       }
@@ -142,7 +145,6 @@ class _SMATHomeState extends State<SMATHome> {
       print("Error al crear: $e");
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -162,10 +164,9 @@ class _SMATHomeState extends State<SMATHome> {
           )
         ],
       ),
-      // --- NUEVO: RefreshIndicator envuelve todo el cuerpo ---
       body: RefreshIndicator(
         onRefresh: () async {
-          setState(() {}); // Recarga la pantalla
+          setState(() {}); 
         },
         child: FutureBuilder(
           future: fetchEstaciones(),
@@ -173,9 +174,8 @@ class _SMATHomeState extends State<SMATHome> {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             } else if (snapshot.hasError) {
-              // --- NUEVO: Pantalla de error amigable para el Lab 7.1 ---
               return ListView(
-                physics: const AlwaysScrollableScrollPhysics(), // Permite deslizar incluso con error
+                physics: const AlwaysScrollableScrollPhysics(),
                 children: [
                   SizedBox(
                     height: MediaQuery.of(context).size.height * 0.7,
@@ -200,13 +200,29 @@ class _SMATHomeState extends State<SMATHome> {
             } else {
               final estaciones = snapshot.data as List;
               return ListView.builder(
-                physics: const AlwaysScrollableScrollPhysics(), // Crucial para Pull-to-refresh
+                physics: const AlwaysScrollableScrollPhysics(), 
                 itemCount: estaciones.length,
-                itemBuilder: (context, index) => ListTile(
-                  leading: const Icon(Icons.satellite_alt, color: Colors.blue),
-                  title: Text(estaciones[index]['nombre']),
-                  subtitle: Text(estaciones[index]['ubicacion']),
-                ),
+                itemBuilder: (context, index) {
+                  final estacion = estaciones[index];
+                  
+                  // Lee de forma segura el campo 'ultima_lectura' que envía tu Backend
+                  final valor = estacion is Map && estacion.containsKey('ultima_lectura') 
+                      ? (estacion['ultima_lectura'] as num).toDouble() 
+                      : 0.0;
+
+                  return ListTile(
+                    leading: Icon(
+                      Icons.water_drop, 
+                      // Reto de colores: Rojo si hay peligro (>70), Verde si está normal
+                      color: valor > 70.0 ? Colors.red : Colors.green, 
+                    ),
+                    title: Text(estacion['nombre'] ?? 'Sin Nombre'),
+                    subtitle: Text("${estacion['ubicacion'] ?? 'Sin Ubicación'} - Nivel: ${valor.toStringAsFixed(2)} cm"),
+                    trailing: valor > 70.0 
+                      ? const Icon(Icons.warning, color: Colors.red) 
+                      : const Icon(Icons.check_circle, color: Colors.green),
+                  );
+                },
               );
             }
           },

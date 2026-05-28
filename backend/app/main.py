@@ -2,17 +2,22 @@ from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
-from pydantic import BaseModel # <-- NUEVO: Para validar el JSON
+from pydantic import BaseModel 
 from . import models, database 
 
 # Inicialización de la Base de Datos
 models.Base.metadata.create_all(bind=database.engine)
 
-# --- ESQUEMA PYDANTIC (NUEVO) ---
+# --- ESQUEMAS PYDANTIC DE VALIDACIÓN ---
 class EstacionCreate(BaseModel):
     id: int
     nombre: str
     ubicacion: str
+
+# NUEVO: Modelo Pydantic para recibir las lecturas en el cuerpo (Body) de la petición JSON
+class LecturaCreate(BaseModel):
+    estacion_id: int
+    valor: float
 
 # --- METADATOS DE DOCUMENTACIÓN ---
 app = FastAPI(
@@ -49,9 +54,9 @@ def get_db():
 # --- ENDPOINTS PROTEGIDOS ---
 
 @app.post("/estaciones/", status_code=status.HTTP_201_CREATED, tags=["Gestión"], summary="Registrar nueva estación")
-def crear_estacion(estacion: EstacionCreate, # <-- AHORA USA EL MODELO
-                   db: Session = Depends(get_db), 
-                   token: str = Depends(oauth2_scheme)): 
+def crear_estacion(estacion: EstacionCreate, 
+                    db: Session = Depends(get_db), 
+                    token: str = Depends(oauth2_scheme)): 
     if token != "token_secreto_unmsm_2026":
         raise HTTPException(status_code=401, detail="No autorizado")
     
@@ -65,18 +70,26 @@ def crear_estacion(estacion: EstacionCreate, # <-- AHORA USA EL MODELO
     db.refresh(nueva)
     return nueva
 
+# MODIFICADO: Ahora el endpoint recibe el payload del JSON usando el esquema LecturaCreate
 @app.post("/lecturas/", status_code=201, tags=["Telemetría"], summary="Registrar lectura de sensor")
-def registrar_lectura(estacion_id: int, valor: float, 
+def registrar_lectura(lectura: LecturaCreate, # <-- CAMBIO CLAVE: Cambiado de campos sueltos al modelo estructurado
                       db: Session = Depends(get_db),
                       token: str = Depends(oauth2_scheme)):
-    estacion = db.query(models.Estacion).filter(models.Estacion.id == estacion_id).first()
+    
+    # Validación de token si tu laboratorio lo requiere para telemetría
+    if token != "token_secreto_unmsm_2026":
+        raise HTTPException(status_code=401, detail="No autorizado")
+
+    # Buscamos usando el objeto pydantic: lectura.estacion_id
+    estacion = db.query(models.Estacion).filter(models.Estacion.id == lectura.estacion_id).first()
     if not estacion:
         raise HTTPException(status_code=404, detail="Estación no encontrada")
     
-    nueva = models.Lectura(estacion_id=estacion_id, valor=valor)
+    # Insertamos en la BD usando los datos del payload recibido
+    nueva = models.Lectura(estacion_id=lectura.estacion_id, valor=lectura.valor)
     db.add(nueva)
     db.commit()
-    return {"status": "Lectura guardada", "valor": valor}
+    return {"status": "Lectura guardada", "valor": lectura.valor}
 
 # --- ENDPOINTS DE CONSULTA ---
 
@@ -97,6 +110,19 @@ def obtener_historial(id: int, db: Session = Depends(get_db)):
         "lecturas": valores
     }
 
+# En tu main.py, dentro de app/main.py
 @app.get("/estaciones/", tags=["Gestión"])
-def listar(db: Session = Depends(get_db)):
-    return db.query(models.Estacion).all()
+def listar_con_lecturas(db: Session = Depends(get_db)):
+    # Trae todas las estaciones
+    estaciones = db.query(models.Estacion).all()
+    lista_final = []
+    for est in estaciones:
+        # Obtiene la última lectura registrada para esta estación
+        ultima = db.query(models.Lectura).filter(models.Lectura.estacion_id == est.id).order_by(models.Lectura.id.desc()).first()
+        lista_final.append({
+            "id": est.id,
+            "nombre": est.nombre,
+            "ubicacion": est.ubicacion,
+            "ultima_lectura": ultima.valor if ultima else 0.0 # <--- ESTO ES LO QUE VERÁ FLUTTER
+        })
+    return lista_final
