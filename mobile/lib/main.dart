@@ -43,7 +43,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _passController = TextEditingController();
 
   Future<void> _login() async {
-    final url = Uri.parse("http://192.168.0.114:8000/login"); 
+    final url = Uri.parse("http://127.0.0.1:8000/login"); 
     
     try {
       // Petición optimizada para evitar problemas de CORS y bloqueos en Flutter Web
@@ -101,7 +101,7 @@ class SMATHome extends StatefulWidget {
 }
 
 class _SMATHomeState extends State<SMATHome> {
-  final String backendUrl = "http://192.168.0.114:8000/estaciones/";
+  final String backendUrl = "http://127.0.0.1:8000/estaciones/";
 
   Future<List<dynamic>> fetchEstaciones() async {
     try {

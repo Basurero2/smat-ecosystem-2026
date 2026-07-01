@@ -27,12 +27,13 @@ app = FastAPI(
     Esta API permite gestionar estaciones de monitoreo y procesar lecturas de sensores con seguridad avanzada.
     """,
     version="1.6.2",
-    contact={"name": "Juan Carlos", "email": "juan.carlos@unmsm.edu.pe"}
+    contact={"name": "Juan Carlos", "email": "juan.mamania@unmsm.edu.pe"}
 )
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], 
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )

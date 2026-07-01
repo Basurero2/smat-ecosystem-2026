@@ -4,7 +4,7 @@ import random
 
 # --- CONFIGURACIÓN DEL SISTEMA ---
 # Usa tu IP real configurada (192.168.0.114) o localhost si pruebas de forma interna en la PC
-API_URL = "http://192.168.0.114:8000/lecturas/" 
+API_URL = "http://127.0.0.1:8000/lecturas/"     # mi IP 192.168.0.114
 ESTACION_ID = 1  # ID de la estación que registraste en tu base de datos SQLite
 
 # NOTA: Reemplaza esto por un token real generado en tu login (Semanas 4 y 6)

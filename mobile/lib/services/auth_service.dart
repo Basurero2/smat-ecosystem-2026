@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
   // --- NUEVO: Método para hablar con el Backend ---
-  final String baseUrl = "http://192.168.0.144:8000"; // PON TU IP AQUÍ
+  final String baseUrl = "http://127.0.0.1:8000"; // PON TU IP AQUÍ  192.168.0.144
 
   Future<bool> login(String username, String password) async {
     try {

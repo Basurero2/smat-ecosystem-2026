@@ -14,7 +14,7 @@ class EstacionDetailScreen extends StatefulWidget {
 
 class _EstacionDetailScreenState extends State<EstacionDetailScreen> {
   // Ajusta la IP según tu configuración
-  final String baseUrl = "http://192.168.0.114:8000";
+  final String baseUrl = "http://127.0.0.1:8000";
 
   Future<Map<String, dynamic>> fetchHistorial() async {
     final response = await http.get(Uri.parse("$baseUrl/estaciones/${widget.estacionId}/historial"));
